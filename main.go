@@ -146,12 +146,20 @@ func server(args []string) {
 	reverse := flags.Bool("reverse", false, "")
 	pid := flags.Bool("pid", false, "")
 	verbose := flags.Bool("v", false, "")
+	mTLSKey := flags.String("mtls-key", "", "")
+	mTLSCert := flags.String("mtls-cert",  "", "")
+
+	var clientCACerts chshare.StringList
+	flags.Var(&clientCACerts, "client-ca-certs", "")
 
 	flags.Usage = func() {
 		fmt.Print(serverHelp)
 		os.Exit(1)
 	}
-	flags.Parse(args)
+
+	if err := flags.Parse(args); err != nil {
+		log.Fatal(err)
+	}
 
 	if *host == "" {
 		*host = os.Getenv("HOST")
@@ -172,12 +180,15 @@ func server(args []string) {
 		*key = os.Getenv("CHISEL_KEY")
 	}
 	s, err := chserver.NewServer(&chserver.Config{
-		KeySeed:  *key,
-		AuthFile: *authfile,
-		Auth:     *auth,
-		Proxy:    *proxy,
-		Socks5:   *socks5,
-		Reverse:  *reverse,
+		KeySeed:       *key,
+		AuthFile:      *authfile,
+		Auth:          *auth,
+		Proxy:         *proxy,
+		Socks5:        *socks5,
+		Reverse:       *reverse,
+		TLSKey:        *mTLSKey,
+		TLSCert:       *mTLSCert,
+		ClientCACerts: clientCACerts,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -281,11 +292,19 @@ func client(args []string) {
 	pid := flags.Bool("pid", false, "")
 	hostname := flags.String("hostname", "", "")
 	verbose := flags.Bool("v", false, "")
+	mTLSKey := flags.String("mtls-key", "", "")
+	mTLSCert := flags.String("mtls-cert",  "", "")
+
+	var rootCACerts chshare.StringList
+	flags.Var(&rootCACerts, "root-ca-certs", "")
+
 	flags.Usage = func() {
 		fmt.Print(clientHelp)
 		os.Exit(1)
 	}
-	flags.Parse(args)
+	if err := flags.Parse(args); err != nil {
+		log.Fatal(err)
+	}
 	//pull out options, put back remaining args
 	args = flags.Args()
 	if len(args) < 2 {
@@ -304,6 +323,9 @@ func client(args []string) {
 		Server:           args[0],
 		Remotes:          args[1:],
 		HostHeader:       *hostname,
+		TLSKey:           *mTLSKey,
+		TLSCert:          *mTLSCert,
+		RootCACerts:      rootCACerts,
 	})
 	if err != nil {
 		log.Fatal(err)

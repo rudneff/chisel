@@ -20,15 +20,18 @@ import (
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed  string
-	AuthFile string
-	Auth     string
-	Proxy    string
-	Socks5   bool
-	Reverse  bool
+	KeySeed       string
+	AuthFile      string
+	Auth          string
+	Proxy         string
+	Socks5        bool
+	Reverse       bool
+	TLSCert       string
+	TLSKey        string
+	ClientCACerts []string
 }
 
-// Server respresent a chisel service
+// Server represent a chisel service
 type Server struct {
 	*chshare.Logger
 	connStats    chshare.ConnStats
@@ -71,6 +74,15 @@ func NewServer(config *Config) (*Server, error) {
 			s.users.AddUser(u)
 		}
 	}
+	//configuring mutual TLS server side
+	if config.ClientCACerts != nil {
+		var err error
+		s.httpServer.TLSConfig, err = chshare.NewTLSConfig(config.TLSCert, config.TLSKey, nil, &config.ClientCACerts)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	//generate private key (optionally using seed)
 	key, _ := chshare.GenerateKey(config.KeySeed)
 	//convert into ssh.PrivateKey

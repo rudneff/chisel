@@ -2,6 +2,7 @@ package chclient
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -29,6 +30,9 @@ type Config struct {
 	HTTPProxy        string
 	Remotes          []string
 	HostHeader       string
+	TLSCert          string
+	TLSKey           string
+	RootCACerts      []string
 }
 
 //Client represents a client instance
@@ -42,13 +46,14 @@ type Client struct {
 	running      bool
 	runningc     chan error
 	connStats    chshare.ConnStats
+	TLSConfig   *tls.Config
 }
 
 //NewClient creates a new client instance
 func NewClient(config *Config) (*Client, error) {
 	//apply default scheme
 	if !strings.HasPrefix(config.Server, "http") {
-		config.Server = "http://" + config.Server
+		config.Server = "https://" + config.Server
 	}
 	if config.MaxRetryInterval < time.Second {
 		config.MaxRetryInterval = 5 * time.Minute
@@ -102,6 +107,10 @@ func NewClient(config *Config) (*Client, error) {
 		Timeout:         30 * time.Second,
 	}
 
+	client.TLSConfig, err = chshare.NewTLSConfig(config.TLSCert, config.TLSKey, &config.RootCACerts, nil)
+	if err != nil {
+		return nil, fmt.Errorf("invalid proxy TLS configuration: %s", err)
+	}
 	return client, nil
 }
 
@@ -192,6 +201,7 @@ func (c *Client) connectionLoop() {
 			WriteBufferSize:  1024,
 			HandshakeTimeout: 45 * time.Second,
 			Subprotocols:     []string{chshare.ProtocolVersion},
+			TLSClientConfig:  c.TLSConfig,
 		}
 		//optionally CONNECT proxy
 		if c.httpProxyURL != nil {

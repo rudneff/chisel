@@ -34,9 +34,18 @@ func (h *HTTPServer) GoListenAndServe(addr string, handler http.Handler) error {
 	h.isRunning = true
 	h.Handler = handler
 	h.listener = l
-	go func() {
-		h.closeWith(h.Serve(l))
-	}()
+	var serve func()
+	if h.TLSConfig != nil {
+		// if TLS parameters were configured, choose appropriate server
+		serve = func(){
+			h.closeWith(h.ServeTLS(l, "", ""))
+		}
+	} else {
+		serve = func(){
+			h.closeWith(h.Serve(l))
+		}
+	}
+	go serve()
 	return nil
 }
 
